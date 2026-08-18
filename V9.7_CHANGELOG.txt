@@ -1,0 +1,22 @@
+Life Planner V9.7 — Sync/Data Integrity Fix
+
+1. Google Sheet selection is now carried with every API request.
+   The Apps Script no longer relies only on one global ACTIVE_SHEET_ID when a saved sheetId is supplied.
+   This prevents a device from silently syncing to a different sheet configured on the backend.
+
+2. All module logs use the health store and are uploaded as separate Google Sheet tabs:
+   Gym_Workouts, Cardio_Core, Body_Measurements, Food_Logs, Water_Logs, Health_Issues.
+
+3. Health sync now uploads raw local records, including deletion tombstones.
+   Rendering excludes deleted records.
+
+4. Deleting a water log now immediately hides it locally and sends its deleted tombstone to Google Sheets.
+   The cloud copy is therefore also marked deleted instead of remaining only in IndexedDB.
+
+5. Transactions and health records now distinguish active records from raw sync records.
+   Deleted records no longer distort dashboard totals/reports while remaining available for sync reconciliation.
+
+6. Removed the persistent sync status dot from the header that could appear as an unexplained dot on every page.
+
+7. Existing offline-first behavior is preserved.
+   Sync failure never clears IndexedDB.
