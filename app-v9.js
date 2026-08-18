@@ -27,13 +27,15 @@ function openDB(){return new Promise((ok,no)=>{
   probe.onsuccess=()=>{const current=probe.result.version;probe.result.close();openAt(Math.max(DB_VERSION,current))};
   probe.onerror=()=>openAt(DB_VERSION);
 })}
-function allTx(){return new Promise((ok,no)=>{let r=db.transaction(TX_STORE).objectStore(TX_STORE).getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
+function allTxRaw(){return new Promise((ok,no)=>{let r=db.transaction(TX_STORE).objectStore(TX_STORE).getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
+function allTx(){return allTxRaw().then(rows=>rows.filter(x=>!x.deleted))}
 function putTx(x){return new Promise((ok,no)=>{let r=db.transaction(TX_STORE,'readwrite').objectStore(TX_STORE).put(x);r.onsuccess=ok;r.onerror=()=>no(r.error)})}
 function clearTx(){return new Promise((ok,no)=>{let r=db.transaction(TX_STORE,'readwrite').objectStore(TX_STORE).clear();r.onsuccess=ok;r.onerror=()=>no(r.error)})}
 function getMeta(){return new Promise((ok,no)=>{let r=db.transaction(META_STORE).objectStore(META_STORE).get('meta');r.onsuccess=()=>ok(r.result?.value||{income:0,budget:0,categories:defaults.map(x=>({name:x[0],budget:x[1],icon:x[2]}))});r.onerror=()=>no(r.error)})}
 function putMeta(){return new Promise((ok,no)=>{let r=db.transaction(META_STORE,'readwrite').objectStore(META_STORE).put({key:'meta',value:meta});r.onsuccess=ok;r.onerror=()=>no(r.error)})}
 function deviceId(){let x=localStorage.getItem(DEVICE_KEY);if(!x){x='DEV-'+uid();localStorage.setItem(DEVICE_KEY,x)}return x}
-function allHealth(){return new Promise((ok,no)=>{let r=db.transaction(HEALTH_STORE).objectStore(HEALTH_STORE).getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
+function allHealthRaw(){return new Promise((ok,no)=>{let r=db.transaction(HEALTH_STORE).objectStore(HEALTH_STORE).getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
+function allHealth(){return allHealthRaw().then(rows=>rows.filter(x=>!x.deleted))}
 function putHealth(x){return new Promise((ok,no)=>{let r=db.transaction(HEALTH_STORE,'readwrite').objectStore(HEALTH_STORE).put(x);r.onsuccess=ok;r.onerror=()=>no(r.error)})}
 function deleteHealth(id){return new Promise((ok,no)=>{let r=db.transaction(HEALTH_STORE,'readwrite').objectStore(HEALTH_STORE).delete(id);r.onsuccess=ok;r.onerror=()=>no(r.error)})}
 function healthUid(prefix='HL'){return prefix+'-'+uid()}
@@ -228,8 +230,8 @@ async function water(){
 }
 function openIssue(){openModal(`<h2>Add Health Issue</h2><div class="field"><label>Date</label><input id="iDate" type="date" value="${today()}"></div><div class="field"><label>Issue</label><input id="iIssue" placeholder="Back pain, fatigue, headache…"></div><div class="field"><label>Severity (1–10)</label><input id="iSeverity" type="number" min="1" max="10" value="5"></div><div class="field"><label>Notes</label><input id="iNote" placeholder="Optional note"></div><button class="submit" onclick="saveIssue()">Save Issue</button>`)}
 async function saveIssue(){let issue=document.getElementById('iIssue').value.trim();if(!issue)return alert('Enter an issue.');let x={id:healthUid('IS'),kind:'issue',created:Date.now(),updated:Date.now(),date:selectedDate('iDate'),issue,severity:Math.max(1,Math.min(10,num(document.getElementById('iSeverity').value))),note:document.getElementById('iNote').value.trim()};await putHealth(x);closeModal();await render();syncHealthNow()}
-async function removeHealth(id){if(!confirm('Delete this log?'))return;const rows=await allHealth();const x=rows.find(r=>r.id===id);if(x){x.deleted=true;x.updated=Date.now();await putHealth(x)}await render();syncHealthNow()}
-async function syncHealthNow(){if(!syncConfig||!navigator.onLine)return;try{let h=await allHealth();let r=await api('upsertHealth',{records:h});if(r.ok){syncConfig.lastSync=Date.now();syncConfig.devices=r.devices||syncConfig.devices||[];localStorage.setItem(SYNC_KEY,JSON.stringify(syncConfig));updateBadge()}}catch(e){console.warn('Health background sync failed',e)}}
+async function removeHealth(id){if(!confirm('Delete this log?'))return;const rows=await allHealthRaw();const x=rows.find(r=>r.id===id);if(x){x.deleted=true;x.updated=Date.now();await putHealth(x)}await render();syncHealthNow()}
+async function syncHealthNow(){if(!syncConfig||!navigator.onLine)return;try{let h=await allHealthRaw();let r=await api('upsertHealth',{records:h});if(r.ok){syncConfig.lastSync=Date.now();syncConfig.devices=r.devices||syncConfig.devices||[];localStorage.setItem(SYNC_KEY,JSON.stringify(syncConfig));updateBadge()}}catch(e){console.warn('Health background sync failed',e)}}
 function disableWaterReminders(){
   if(window.LPWaterReminders?.disable) window.LPWaterReminders.disable();
   else if(window.LPWaterReminders){const s=window.LPWaterReminders.get();s.enabled=false;window.LPWaterReminders.save(s);}
@@ -297,7 +299,7 @@ async function api(action,payload={}){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),20000);
   try{
-    const r=await fetch(DEFAULT_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,deviceId:deviceId(),deviceName:syncConfig?.deviceName||deviceNameGuess(),...payload}),signal:controller.signal,cache:'no-store'});
+    const r=await fetch(DEFAULT_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,deviceId:deviceId(),deviceName:syncConfig?.deviceName||deviceNameGuess(),sheetId:syncConfig?.sheetId||'',...payload}),signal:controller.signal,cache:'no-store'});
     const text=await r.text();
     let data;try{data=JSON.parse(text)}catch(e){throw Error('Apps Script returned non-JSON (HTTP '+r.status+'): '+text.slice(0,180))}
     if(!r.ok) throw Error('Apps Script HTTP '+r.status+(data?.error?': '+data.error:''));
@@ -335,15 +337,15 @@ async function startConnection(){
     closeModal();updateBadge();await render();toast('Google Sheets connected and synced.');
   }catch(e){console.error('CONNECT ERROR',e);if(err)err.textContent='Connection failed: '+(e.message||e);if(btn){btn.disabled=false;btn.textContent='Connect & Merge'}}
 }
-async function mergeLocalWithCloud(cloud,pushAfterMerge=true){const local=await allTx(),m=new Map();[...cloud,...local].forEach(x=>{const old=m.get(x.id);if(!old||Number(x.updated||x.created||0)>Number(old.updated||old.created||0))m.set(x.id,x)});for(const x of m.values())await putTx({...x});if(pushAfterMerge&&syncConfig){const r=await api('upsertMany',{transactions:[...m.values()]});if(!r.ok)throw Error(r.error||'Upload failed');if(r.health)await mergeHealth(r.health,false);syncConfig.lastSync=Date.now();syncConfig.devices=r.devices||[];localStorage.setItem(SYNC_KEY,JSON.stringify(syncConfig))}}
-async function mergeHealth(cloud,pushAfterMerge=true){const local=await allHealth(),m=new Map();[...(cloud||[]),...local].forEach(x=>{const old=m.get(x.id);if(!old||Number(x.updated||x.created||0)>Number(old.updated||old.created||0))m.set(x.id,x)});for(const x of m.values())await putHealth({...x});if(pushAfterMerge&&syncConfig){const r=await api('upsertHealth',{records:[...m.values()]});if(!r.ok)throw Error(r.error||'Health upload failed')}}
+async function mergeLocalWithCloud(cloud,pushAfterMerge=true){const local=await allTxRaw(),m=new Map();[...cloud,...local].forEach(x=>{const old=m.get(x.id);if(!old||Number(x.updated||x.created||0)>Number(old.updated||old.created||0))m.set(x.id,x)});for(const x of m.values())await putTx({...x});if(pushAfterMerge&&syncConfig){const r=await api('upsertMany',{transactions:[...m.values()]});if(!r.ok)throw Error(r.error||'Upload failed');if(r.health)await mergeHealth(r.health,false);syncConfig.lastSync=Date.now();syncConfig.devices=r.devices||[];localStorage.setItem(SYNC_KEY,JSON.stringify(syncConfig))}}
+async function mergeHealth(cloud,pushAfterMerge=true){const local=await allHealthRaw(),m=new Map();[...(cloud||[]),...local].forEach(x=>{const old=m.get(x.id);if(!old||Number(x.updated||x.created||0)>Number(old.updated||old.created||0))m.set(x.id,x)});for(const x of m.values())await putHealth({...x});if(pushAfterMerge&&syncConfig){const r=await api('upsertHealth',{records:[...m.values()]});if(!r.ok)throw Error(r.error||'Health upload failed')}}
 async function syncMetaNow(){if(!syncConfig)return;try{const r=await api('upsertMeta',{meta});if(r.ok){syncConfig.lastSync=Date.now();localStorage.setItem(SYNC_KEY,JSON.stringify(syncConfig));updateBadge()}}catch(e){console.warn('Meta sync failed',e)}}
 let syncBusy=false;
 async function syncNow(manual=false){
   if(syncBusy)return;if(!navigator.onLine){updateBadge();if(manual)toast('Offline — data is saved locally.');return}
   if(!syncConfig){if(!manual)return;if(!(await discoverConnection())){connectWizard();return}}
   syncBusy=true;const b=document.getElementById('syncBadge');b?.classList.add('syncing');if(b)b.querySelector('span').textContent='Syncing…';
-  try{const r=await api('getAll');if(!r.ok)throw Error('Cloud read failed: '+(r.error||'unknown error'));await mergeLocalWithCloud(r.transactions||[],false);await mergeHealth(r.health||[],false);await mergeMetaCloud(r.meta);const allT=await allTx(),allH=await allHealth();const up=await api('upsertMany',{transactions:allT});if(!up.ok)throw Error('Transactions sync failed: '+(up.error||'unknown error'));const uh=await api('upsertHealth',{records:allH});if(!uh.ok)throw Error('Health sync failed: '+(uh.error||'unknown error'));const um=await api('upsertMeta',{meta});if(!um.ok)throw Error('Categories/budget sync failed: '+(um.error||'unknown error'));syncConfig.devices=uh.devices||up.devices||um.devices||syncConfig.devices||[];syncConfig.lastSync=Date.now();localStorage.setItem(SYNC_KEY,JSON.stringify(syncConfig));updateBadge();if(manual)toast('Sync complete')}
+  try{const r=await api('getAll');if(!r.ok)throw Error('Cloud read failed: '+(r.error||'unknown error'));await mergeLocalWithCloud(r.transactions||[],false);await mergeHealth(r.health||[],false);await mergeMetaCloud(r.meta);const allT=await allTxRaw(),allH=await allHealthRaw();const up=await api('upsertMany',{transactions:allT});if(!up.ok)throw Error('Transactions sync failed: '+(up.error||'unknown error'));const uh=await api('upsertHealth',{records:allH});if(!uh.ok)throw Error('Health sync failed: '+(uh.error||'unknown error'));const um=await api('upsertMeta',{meta});if(!um.ok)throw Error('Categories/budget sync failed: '+(um.error||'unknown error'));syncConfig.devices=uh.devices||up.devices||um.devices||syncConfig.devices||[];syncConfig.lastSync=Date.now();localStorage.setItem(SYNC_KEY,JSON.stringify(syncConfig));updateBadge();if(manual)toast('Sync complete')}
   catch(e){console.error('SYNC ERROR',e);updateBadge();if(manual)toast((e?.message||'Sync failed')+' — local data is safe.')}
   finally{b?.classList.remove('syncing');updateBadge();syncBusy=false}
 }
