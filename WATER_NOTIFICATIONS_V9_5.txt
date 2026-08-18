@@ -1,0 +1,11 @@
+V9.5 adds water reminder scheduling and a dynamic browser/PWA favicon.
+
+Water reminders:
+- User-controlled interval, start/end time and amount.
+- Notification permission is requested only when the user enables reminders.
+- Offline data remains local.
+
+Icon:
+- Browser favicon can reflect water progress while the app is running.
+- iOS Home Screen icons are cached/static for web apps; a permanently changing iOS Home Screen icon cannot be reliably implemented with ordinary web JavaScript.
+- For a true live iOS Home Screen icon, a native iOS app/dynamic app icon implementation is required.

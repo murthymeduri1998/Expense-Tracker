@@ -1,0 +1,11 @@
+{
+  "name": "Life Planner — Finance, Fitness & Health",
+  "short_name": "Life Planner",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "background_color": "#f7f8fa",
+  "theme_color": "#0f766e",
+  "icons": [{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}

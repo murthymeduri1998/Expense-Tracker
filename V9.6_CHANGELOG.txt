@@ -1,0 +1,56 @@
+Life Planner V9.6 — Full consolidated update
+
+Preserved architecture
+- IndexedDB remains the local/offline source of truth.
+- Google Apps Script / Google Sheets remains the sync/cloud layer.
+- Existing DB version is never downgraded.
+- Sync failures never clear local data.
+- Existing Google connection is retained during temporary discovery failures.
+- Mobile uses the sidebar only; no bottom navigation.
+- Desktop uses a fixed sidebar and fixed header; only the main content area scrolls.
+
+UI / dashboard
+- Dashboard does not contain Budget Overview.
+- Dashboard does not contain Recent Transactions.
+- Dashboard does not contain a Quick Actions block.
+- Finance contains budget and recent transaction detail.
+- Reports remain inside Reports and do not redirect to logging modules.
+
+Fitness
+- Multiple free-hand exercises can be added in one Gym workout.
+- Cardio/Core uses free-hand exercise names.
+- Weekly weight comparison and insight are included in Body & Weight.
+- Body measurements remain monthly.
+
+Food
+- Multiple food items can be added in one meal.
+- Each food row accepts food name + grams in the same field.
+- No quantity dropdown.
+- No static exercise dropdown.
+
+Water
+- Animated water glass and liquid/wave motion.
+- Weekly hydration chart.
+- Water reminder settings with interval, amount and time window.
+- Local reminder configuration.
+- Browser/PWA notification support when permission is granted.
+- Dynamic browser favicon reflects current water percentage.
+- iOS Home Screen icon uses a water-glass icon; live dynamic Home Screen icon changes are not supported reliably by normal web/PWA code.
+
+Offline / PWA
+- Added service worker shell caching so the application shell can reopen offline after it has been loaded once.
+- Offline profile/login remains local.
+- No Google request is made while offline.
+
+Google Sheets
+- Finance transactions stored in Transactions.
+- Gym workouts stored in Gym_Workouts.
+- Cardio/Core stored in Cardio_Core.
+- Body measurements/weight stored in Body_Measurements.
+- Food stored in Food_Logs.
+- Water stored in Water_Logs.
+- Health issues stored in Health_Issues.
+- Categories stored in Categories.
+- Device state stored in Devices.
+- Sync metadata stored in Sync_Metadata.
+- Internal record IDs/timestamps/deletion flags are hidden in the user-facing Google Sheet columns while retained for reliable synchronization.
